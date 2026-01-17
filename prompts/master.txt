@@ -1,0 +1,825 @@
+# 🚀 PROMPT COMPLETO PARA REPLICAÇÃO DE PROJETO - ENTERPRISE AI DASHBOARD
+
+> **Objetivo**: Utilizar este prompt para replicar a arquitetura completa do projeto VNC (Chat IA com Dashboard Analítico) para QUALQUER outro problema de negócio.
+
+---
+
+## 📋 INSTRUÇÕES PARA USO
+
+**ANTES DE EXECUTAR**:
+1. Substitua `{innovox_BI}` pelo nome do seu projeto
+2. Substitua `{DESCRICAO_NEGOCIO}` pela descrição do problema de negócio
+3. Substitua `{PORTA_POSTGRES}` Valide a porta que não esteja em uso (ex: 5436, 5437...)
+4. Substitua `{PORTA_REDIS}` valide a porta que nao esteja em uso  (ex: 6381, 6382...)
+5. Substitua `{SUA_API_KEY}` pela sua chave API do DeepSeek ou outro LLM coloque essa api do deepseek no env para o nosos chat : sk-6dc0381d8c484da79baf063750b4bac0   essa api será depois removida é apenas para teste então pode colocar sem nehum problema 
+
+**VALIDAÇÃO DE PORTAS DOCKER (EXECUTE ANTES)**:
+```powershell ou wsl 2 wntão vai depender do q estaremos usando no momento. 
+# Verificar portas Postgres em uso:
+docker ps --format "table {{.Names}}\t{{.Ports}}" | Select-String "5432|5433|5434|5435|5436"
+
+# Verificar portas Redis em uso:
+docker ps --format "table {{.Names}}\t{{.Ports}}" | Select-String "6379|6380|6381|6382"
+
+# Se precisar ver TODAS as portas em uso:
+netstat -ano | findstr "LISTENING" | findstr "5432 5433 5434 5435 6379 6380"
+```
+
+---
+
+## 🎯 O PROMPT
+
+```
+Preciso que você crie um projeto completo de Dashboard Analítico com Chat IA para {DESCRICAO_NEGOCIO}.
+
+O projeto deve seguir EXATAMENTE esta arquitetura e estrutura:
+
+## 1. ESTRUTURA DE PASTAS
+
+{NOME_PROJETO}/
+├── docker-compose.yml
+├── backend/
+│   ├── Dockerfile
+│   ├── requirements.txt
+│   ├── manage.py
+│   ├── .env
+│   ├── config/
+│   │   ├── __init__.py
+│   │   ├── settings.py      # Django settings com Channels/Redis
+│   │   ├── urls.py
+│   │   ├── asgi.py          # WebSocket routing
+│   │   └── wsgi.py
+│   ├── core/
+│   │   ├── __init__.py
+│   │   ├── admin.py
+│   │   ├── apps.py
+│   │   ├── models.py        # Django ORM models
+│   │   ├── views.py         # REST API views
+│   │   ├── serializers.py   # DRF serializers
+│   │   ├── urls.py          # API routes
+│   │   ├── dashboard_views.py  # Dashboard analytics endpoints
+│   │   ├── chat_consumer.py    # WebSocket consumer para chat
+│   │   ├── duckdb_manager.py   # DuckDB queries em memória
+│   │   ├── etl.py              # ETL SQL Server -> Parquet
+│   │   └── migrations/
+│   ├── core_ai/
+│   │   ├── __init__.py
+│   │   ├── config_geral.py     # API Keys e configs LLM
+│   │   ├── agent_graph.py      # LangGraph Agent principal
+│   │   ├── data/
+│   │   │   ├── semantic_layer.json   # Camada semântica (métricas/entidades)
+│   │   │   └── domain_knowledge.py   # Mapeamentos de domínio
+│   │   ├── tools/
+│   │   │   ├── schema_linker.py      # TF-IDF para RAG
+│   │   │   └── sql_tool.py           # Tool de execução SQL
+│   │   ├── sql_expert/
+│   │   │   ├── sql_engineer.py       # LangGraph SQL Expert
+│   │   │   └── db_inspector.py       # Introspecção de bancos externos
+│   │   ├── excel_agent/
+│   │   │   ├── graph.py              # Agent para Excel upload
+│   │   │   └── ingestion.py          # Conversão Excel -> Parquet
+│   │   └── utils/
+│   │       └── logger.py
+│   └── data/
+│       ├── uploads/
+│       ├── parquet/
+│       └── duckdb/
+├── frontend/
+│   ├── Dockerfile
+│   ├── package.json
+│   ├── vite.config.js
+│   ├── tailwind.config.js
+│   ├── index.html
+│   └── src/
+│       ├── main.jsx
+│       ├── App.jsx          # Navegação principal com sidebar
+│       ├── index.css        # Tailwind imports
+│       └── pages/
+│           ├── ChatAI.jsx       # Chat com WebSocket
+│           ├── SqlExpert.jsx    # SQL Expert para DBs externos
+│           ├── ExcelAgent.jsx   # Upload e análise Excel
+│           ├── ReportingGeral.jsx  # Dashboard com gráficos
+│           └── Login.jsx
+└── data/
+    └── raw/        # Dados Parquet para análise
+
+## 2. DOCKER-COMPOSE (CRÍTICO - VALIDAR PORTAS!)
+
+IMPORTANTE: Antes de criar, verificar se as portas {PORTA_POSTGRES} e {PORTA_REDIS} estão livres!
+
+```yaml
+version: '3.8'
+
+services:
+  db:
+    image: postgres:15
+    container_name: {NOME_PROJETO}_postgres
+    restart: always
+    environment:
+      - POSTGRES_DB={NOME_PROJETO}_db
+      - POSTGRES_USER={NOME_PROJETO}_user
+      - POSTGRES_PASSWORD={NOME_PROJETO}_password
+    ports:
+      - "{PORTA_POSTGRES}:5432"  # PORTA EXTERNA:INTERNA - VERIFICAR DISPONIBILIDADE!
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U {NOME_PROJETO}_user -d {NOME_PROJETO}_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: {NOME_PROJETO}_redis
+    restart: always
+    ports:
+      - "{PORTA_REDIS}:6379"  # PORTA EXTERNA:INTERNA - VERIFICAR DISPONIBILIDADE!
+    volumes:
+      - redis_data:/data
+
+  backend:
+    build:
+      context: ./backend
+    container_name: {NOME_PROJETO}_backend
+    command: daphne -b 0.0.0.0 -p 8000 config.asgi:application
+    volumes:
+      - ./backend:/app
+      - ./data:/app/data
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    environment:
+      - DEBUG=True
+      - DATABASE_URL=postgresql://{NOME_PROJETO}_user:{NOME_PROJETO}_password@db:5432/{NOME_PROJETO}_db
+      - DB_NAME={NOME_PROJETO}_db
+      - DB_USER={NOME_PROJETO}_user
+      - DB_PASSWORD={NOME_PROJETO}_password
+      - DB_HOST=db
+      - DB_PORT=5432
+      - REDIS_URL=redis://redis:6379/1
+      - DEEPSEEK_API_KEY={SUA_API_KEY}
+      - DEEPSEEK_BASE_URL=https://api.deepseek.com
+      - MODEL_NAME=deepseek-chat
+
+  frontend:
+    build:
+      context: ./frontend
+    container_name: {NOME_PROJETO}_frontend
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    ports:
+      - "3000:5173"
+    environment:
+      - CHOKIDAR_USEPOLLING=true
+
+volumes:
+  postgres_data:
+  redis_data:
+```
+
+## 3. BACKEND - REQUIREMENTS.TXT COMPLETO
+
+```
+# Django & REST
+Django==5.1.4
+djangorestframework==3.15.2
+django-cors-headers==4.6.0
+
+# Async & WebSocket
+daphne==4.1.2
+channels==4.2.0
+channels-redis==4.2.1
+
+# Database
+psycopg2-binary==2.9.10
+duckdb==1.1.3
+SQLAlchemy==2.0.45
+sqlglot==28.6.0
+
+# Data Processing
+pandas==2.2.3
+polars==1.21.0
+pyarrow==19.0.0
+openpyxl==3.1.5
+fastexcel==0.12.0
+
+# LLM & AI
+langchain==0.3.17
+langchain-core==0.3.33
+langchain-openai==0.3.3
+langgraph==0.2.66
+langgraph-checkpoint==2.0.10
+openai==1.61.0
+tiktoken==0.12.0
+scikit-learn==1.6.1
+
+# Utilities
+python-dotenv==1.0.1
+redis==5.2.1
+httpx==0.28.1
+pydantic==2.10.6
+
+# SQL Server (se necessário ETL)
+pyodbc==5.2.0
+```
+
+IMPORTANTE: Após criar requirements.txt, gerar pip freeze:
+```bash
+pip freeze > requirements_full.txt
+```
+
+## 4. BACKEND - DOCKERFILE
+
+```dockerfile
+FROM python:3.11-slim
+
+WORKDIR /app
+
+ENV PYTHONDONTWRITEBYTECODE 1
+ENV PYTHONUNBUFFERED 1
+
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    libpq-dev \
+    curl \
+    gnupg2 \
+    unixodbc \
+    unixodbc-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY requirements.txt .
+RUN pip install --upgrade pip && pip install -r requirements.txt
+
+COPY . .
+
+CMD ["python", "manage.py", "runserver", "0.0.0.0:8000"]
+```
+
+## 5. BACKEND - SETTINGS.PY (DJANGO)
+
+```python
+import os
+from pathlib import Path
+from dotenv import load_dotenv
+
+load_dotenv()
+
+BASE_DIR = Path(__file__).resolve().parent.parent
+SECRET_KEY = os.getenv('SECRET_KEY', 'django-insecure-default-key')
+DEBUG = os.getenv('DEBUG', 'False') == 'True'
+ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',')
+
+INSTALLED_APPS = [
+    'daphne',
+    'django.contrib.admin',
+    'django.contrib.auth',
+    'django.contrib.contenttypes',
+    'django.contrib.sessions',
+    'django.contrib.messages',
+    'django.contrib.staticfiles',
+    'rest_framework',
+    'corsheaders',
+    'channels',
+    'core', 
+]
+
+MIDDLEWARE = [
+    'django.middleware.security.SecurityMiddleware',
+    'django.contrib.sessions.middleware.SessionMiddleware',
+    'corsheaders.middleware.CorsMiddleware',
+    'django.middleware.common.CommonMiddleware',
+    'django.middleware.csrf.CsrfViewMiddleware',
+    'django.contrib.auth.middleware.AuthenticationMiddleware',
+    'django.contrib.messages.middleware.MessageMiddleware',
+    'django.middleware.clickjacking.XFrameOptionsMiddleware',
+]
+
+ROOT_URLCONF = 'config.urls'
+WSGI_APPLICATION = 'config.wsgi.application'
+ASGI_APPLICATION = 'config.asgi.application'
+
+# Redis Channels
+REDIS_HOST = os.getenv('REDIS_HOST', 'localhost')
+REDIS_PORT = os.getenv('REDIS_PORT', '6379')
+
+CHANNEL_LAYERS = {
+    "default": {
+        "BACKEND": "channels_redis.core.RedisChannelLayer",
+        "CONFIG": {
+            "hosts": [(REDIS_HOST, int(REDIS_PORT))],
+        },
+    },
+}
+
+# Database PostgreSQL
+DATABASES = {
+    'default': {
+        'ENGINE': 'django.db.backends.postgresql',
+        'NAME': os.getenv('DB_NAME', '{NOME_PROJETO}_db'),
+        'USER': os.getenv('DB_USER', '{NOME_PROJETO}_user'),
+        'PASSWORD': os.getenv('DB_PASSWORD', '{NOME_PROJETO}_password'),
+        'HOST': os.getenv('DB_HOST', 'localhost'),
+        'PORT': os.getenv('DB_PORT', '5432'),
+    }
+}
+
+LANGUAGE_CODE = 'pt-pt'
+TIME_ZONE = 'UTC'
+STATIC_URL = 'static/'
+DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+CORS_ALLOW_ALL_ORIGINS = DEBUG
+```
+
+## 6. BACKEND - ASGI.PY (WebSocket Routing)
+
+```python
+import os
+from django.core.asgi import get_asgi_application
+from channels.routing import ProtocolTypeRouter, URLRouter
+from channels.auth import AuthMiddlewareStack
+from django.urls import path
+
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings')
+
+from core.chat_consumer import ChatConsumer
+
+application = ProtocolTypeRouter({
+    "http": get_asgi_application(),
+    "websocket": AuthMiddlewareStack(
+        URLRouter([
+            path("ws/chat/", ChatConsumer.as_asgi()),
+        ])
+    ),
+})
+```
+
+## 7. BACKEND - CHAT_CONSUMER.PY (WebSocket Handler)
+
+O nosso chat será esse Multiagente abaixo com todas as capacidade
+Agentes (LangGraph StateGraph)
+🕵️ Supervisor - Analisa intenção
+📚 Bibliotecário - Busca contexto semântico (FAISS)
+💻 Eng. SQL - Gera query DuckDB
+⚖️ Auditor - Valida SQL (segurança)
+🚀 Executor - Executa e retorna dados
+Features Técnicas
+✅ DuckDB in-memory (Parquet local)
+✅ LangGraph (State Machine rígida)
+✅ RAG Semântico (FAISS para mapear termos)
+✅ Validação hardcoded (Python, não LLM)
+✅ Streaming de trace (cada agente reporta)
+✅ Self-correction loop (SQL inválido volta ao Eng. SQL)
+
+
+Este é o CORE do chat. Deve:
+- Receber mensagens via WebSocket
+- Rotear para diferentes modos (standard, sql_expert, excel_agent)
+- Transmitir steps dos agentes em tempo real
+- Retornar dados tabulares formatados
+
+Estrutura obrigatória:
+```python
+from channels.generic.websocket import AsyncWebsocketConsumer
+import json
+import asyncio
+from langchain_core.messages import HumanMessage
+
+class ChatConsumer(AsyncWebsocketConsumer):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.mode = "standard"  # standard | sql_expert | excel_agent
+        self.agent = None       # Agent instance
+        
+    async def connect(self):
+        await self.accept()
+        await self.send(text_data=json.dumps({
+            'type': 'connection',
+            'message': '✅ Conectado ao Chat AI'
+        }))
+    
+    async def receive(self, text_data):
+        data = json.loads(text_data)
+        # Router de modos...
+        # Invoke agent graph
+        # Stream agent steps para UI
+        
+    # Implementar handlers para cada modo...
+```
+
+## 8. BACKEND - AGENT_GRAPH.PY (LangGraph Principal)
+
+Arquitetura do Agente:
+- State: TypedDict com messages, context, sql_query, final_answer, trace
+- Nodes: supervisor, schema_specialist, sql_expert, validator, executor
+- Edges: supervisor -> schema -> sql -> validator -> executor (ou retry)
+
+```python
+from langgraph.graph import StateGraph, END
+from langchain_openai import ChatOpenAI
+from langchain_core.messages import BaseMessage, HumanMessage, SystemMessage
+
+class AgentState(TypedDict):
+    messages: List[BaseMessage]
+    context: Dict[str, Any]
+    sql_query: str
+    sql_valid: bool
+    final_answer: Dict[str, Any]
+    trace: List[Dict]
+
+class MainAgent:
+    def __init__(self):
+        self.llm = ChatOpenAI(model=MODEL_NAME, api_key=API_KEY, base_url=BASE_URL)
+        self.graph = self._build_graph()
+        
+    def _build_graph(self):
+        workflow = StateGraph(AgentState)
+        # Adicionar nodes e edges...
+        return workflow.compile()
+```
+
+## 9. BACKEND - SQL_TOOL.PY (Execução SQL com DuckDB)
+
+```python
+import duckdb
+from langchain.tools import tool
+
+@tool
+def execute_analytics(query: str) -> str:
+    """Executa SQL em DuckDB sobre Parquet files."""
+    # Validação de segurança (apenas SELECT/WITH)
+    # Registrar views para os parquets
+    # Executar e retornar JSON
+```
+
+## 10. BACKEND - SCHEMA_LINKER.PY (RAG com TF-IDF)
+
+```python
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.metrics.pairwise import cosine_similarity
+
+class SchemaLinker:
+    """Encontra tabelas/métricas relevantes baseado na pergunta."""
+    def __init__(self, semantic_path):
+        self.load_semantic_layer()
+        self.initialize_vectorizer()
+        
+    def get_relevant_context(self, query: str) -> dict:
+        # TF-IDF similarity search
+        # Retorna métricas e entidades relevantes
+```
+
+## 11. BACKEND - SEMANTIC_LAYER.JSON
+
+Camada semântica para traduzir linguagem natural em SQL:
+
+```json
+{
+    "metrics": {
+        "Nome_Metrica": {
+            "description": "Descrição em português",
+            "sql_snippet": "SUM(coluna)"
+        }
+    },
+    "entities": {
+        "Nome_Entidade": {
+            "description": "Descrição",
+            "column": "nome_coluna_real"
+        }
+    },
+    "directives": {
+        "global_queries": {
+            "keywords": ["total", "geral"],
+            "prohibited_filters": []
+        }
+    }
+}
+```
+
+## 12. FRONTEND - PACKAGE.JSON
+
+```json
+{
+  "name": "frontend",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "axios": "^1.13.2",
+    "clsx": "^2.1.1",
+    "lucide-react": "^0.562.0",
+    "plotly.js": "^3.3.1",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "react-plotly.js": "^2.6.0",
+    "recharts": "^3.6.0",
+    "tailwind-merge": "^3.4.0"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^5.1.1",
+    "autoprefixer": "^10.4.17",
+    "postcss": "^8.4.35",
+    "tailwindcss": "^3.4.1",
+    "vite": "^7.2.4"
+  }
+}
+```
+
+## 13. FRONTEND - DOCKERFILE
+
+```dockerfile
+FROM node:20-alpine
+WORKDIR /app
+COPY package.json package-lock.json* ./
+RUN npm install
+COPY . .
+CMD ["npm", "run", "dev", "--", "--host"]
+```
+
+## 14. FRONTEND - APP.JSX (Navegação)
+
+Sidebar colapsável com seções:
+- Ícones + labels
+- Estado de expansão por seção
+- Roteamento por activeTab
+- Autenticação básica
+
+```jsx
+function App() {
+  const [activeTab, setActiveTab] = useState('Dashboard')
+  const [expandedSections, setExpandedSections] = useState({...})
+  
+  return (
+    <div className="flex h-screen bg-gray-900">
+      {/* Sidebar */}
+      <aside>...</aside>
+      
+      {/* Content */}
+      <main>
+        {activeTab === 'Chat AI' && <ChatAI />}
+        {activeTab === 'Dashboard' && <ReportingGeral />}
+        ...
+      </main>
+    </div>
+  )
+}
+```
+
+## 15. FRONTEND - CHATAI.JSX (Chat com WebSocket)
+
+Componentes obrigatórios:
+- Conexão WebSocket persistente
+- Painel lateral de "Rede de Agentes" (mostra steps)
+- Área de mensagens com suporte a:
+  - Texto
+  - Tabelas de dados
+  - SQL colapsável
+  - KPIs (cards grandes para valores únicos)
+- Input com Enter para enviar
+
+Estilo Dark Theme:
+- Background: #030712, #1a1a2e
+- Accent: #22d3ee (cyan)
+- Borders: #374151
+- Text: white, #9ca3af
+
+```jsx
+export default function ChatAI() {
+    const wsRef = useRef(null);
+    const [messages, setMessages] = useState([]);
+    const [agents, setAgents] = useState([]);
+    
+    useEffect(() => {
+        wsRef.current = new WebSocket('ws://localhost:8000/ws/chat/');
+        wsRef.current.onmessage = (event) => {
+            const data = JSON.parse(event.data);
+            // Handle: connection, agent_step, final_answer, error
+        };
+    }, []);
+    
+    // Render: painel agentes (esquerda) + chat (direita)
+}
+```
+
+## 16. COMANDOS PARA INICIAR
+
+```bash
+# 1. Verificar portas disponíveis
+docker ps --format "table {{.Names}}\t{{.Ports}}"
+
+# 2. Subir containers
+docker-compose up -d
+
+# 3. Verificar logs
+docker-compose logs -f backend
+
+# 4. Migrations Django
+docker-compose exec backend python manage.py migrate
+
+# 5. Criar superuser
+docker-compose exec backend python manage.py createsuperuser
+
+# 6. Acessar aplicação
+# Frontend: http://localhost:3000
+# Backend API: http://localhost:8000/api/
+# Admin Django: http://localhost:8000/admin/
+```
+
+## 17. ENV FILE TEMPLATE (.env)
+
+```env
+DEBUG=True
+SECRET_KEY=django-insecure-gerar-nova-chave-aqui
+
+ALLOWED_HOSTS=localhost,127.0.0.1,0.0.0.0
+
+DB_NAME={NOME_PROJETO}_db
+DB_USER={NOME_PROJETO}_user
+DB_PASSWORD={NOME_PROJETO}_password
+DB_HOST=localhost
+DB_PORT={PORTA_POSTGRES}
+
+REDIS_HOST=localhost
+REDIS_PORT={PORTA_REDIS}
+REDIS_URL=redis://localhost:{PORTA_REDIS}/1
+
+DEEPSEEK_API_KEY={SUA_API_KEY}
+```
+
+---
+
+AGORA, crie este projeto completo para {DESCRICAO_NEGOCIO}.
+
+Adapte:
+1. Os modelos Django (models.py) para as entidades do domínio
+2. A camada semântica (semantic_layer.json) com métricas e entidades do negócio
+3. O domain_knowledge.py com mapeamentos específicos
+4. Os prompts do agent_graph.py para o contexto do negócio
+5. Os dashboards com KPIs relevantes
+
+CERTIFIQUE-SE de:
+- Validar portas Docker antes de criar docker-compose.yml
+- Incluir TODOS os arquivos __init__.py necessários
+- Criar estrutura completa de migrations
+- Testar WebSocket connection
+```
+
+---
+
+## 🔧 CHECKLIST PÓS-CRIAÇÃO
+
+- [ ] Portas Docker validadas e livres
+- [ ] `pip freeze > requirements_full.txt` executado
+- [ ] `.env` configurado com API Keys reais
+- [ ] `docker-compose up -d` sem erros
+- [ ] `python manage.py migrate` executado
+- [ ] WebSocket conectando (`ws://localhost:8000/ws/chat/`)
+- [ ] Frontend carregando em `http://localhost:3000`
+- [ ] Chat respondendo perguntas
+- [ ] Dados Parquet carregando corretamente
+
+---
+
+## 📚 TECNOLOGIAS UTILIZADAS
+
+| Camada | Tecnologia | Versão |
+|--------|------------|--------|
+| **Backend Framework** | Django | 5.1.4 |
+| **REST API** | Django REST Framework | 3.15.2 |
+| **WebSocket** | Django Channels + Daphne | 4.2.0 / 4.1.2 |
+| **Message Broker** | Redis | 7.x |
+| **Database Principal** | PostgreSQL | 15.x |
+| **Analytics Engine** | DuckDB | 1.1.3 |
+| **Data Processing** | Polars + Pandas | 1.21 / 2.2.3 |
+| **LLM Framework** | LangChain + LangGraph | 0.3.17 / 0.2.66 |
+| **LLM Provider** | DeepSeek (ou OpenAI) | deepseek-chat |
+| **Frontend Framework** | React + Vite | 19.2 / 7.2.4 |
+| **CSS Framework** | Tailwind CSS | 3.4.1 |
+| **Charting** | Recharts + Plotly | 3.6 / 3.3.1 |
+| **Container** | Docker Compose | 3.8 |
+
+---
+
+## 🎨 DESIGN SYSTEM abaixo instruções de designer do sistema 
+
+```css
+/* Cores Principais */
+--bg-primary: #030712;
+--bg-secondary: #1a1a2e;
+--accent: #22d3ee;
+--border: #374151;
+--text-primary: #ffffff;
+--text-secondary: #9ca3af;
+--success: #10b981;
+--warning: #f59e0b;
+--error: #ef4444;
+
+/* Componentes */
+--card-bg: rgba(255, 255, 255, 0.05);
+--card-border: rgba(255, 255, 255, 0.1);
+--blur: backdrop-filter: blur(10px);
+```
+
+---
+
+"Crie um layout React moderno com:
+
+✅ Sidebar lateral esquerda (250px, fundo cinza escuro #1f2937)
+✅ Tema escuro (fundo principal preto azulado #030712)
+✅ Navegação com abas verticais organizadas em seções com títulos
+✅ Emojis ao lado de cada item de menu (18px) e nos títulos (14px)
+✅ Títulos das seções em branco (#ffffff) com emoji
+✅ Botões com estados:
+
+Ativo: fundo #374151, texto cyan #22d3ee
+Inativo: fundo transparente, texto cinza #9ca3af
+Hover: fundo #374151, texto branco
+✅ Logo no topo da sidebar
+✅ Perfil do usuário no rodapé da sidebar
+✅ Estilos inline (sem dependência de Tailwind CSS ou CSS externo)
+✅ Flexbox para layout responsivo
+Estrutura:
+
+Seção 1 (🏢 Principal): [listar itens]
+Seção 2 (⚙️ Ferramentas): [listar itens]
+Cores: Sidebar #1f2937, Conteúdo #030712, Destaque #22d3ee"
+
+🎯 Pontos-Chave que Fizeram Diferença
+Usar estilos inline - Evitou problemas com Tailwind/PostCSS
+Especificar cores exatas em hex - Layout consistente
+Emojis Unicode - Funcionam nativamente sem bibliotecas
+Flexbox com gap - Espaçamento perfeito entre emoji e texto
+Estados claros - Ativo, inativo e hover bem definidos
+Seções organizadas - Títulos com emojis separando categorias
+
+Relembrara novamente algumas arquiteturas para não esquecer:
+
+Backend Framework
+Tecnologia	Versão	Uso
+Python	3.11	Linguagem base
+Django	5.1.4	Framework web
+Django REST Framework	3.15.2	API REST
+Django Channels	4.2.0	WebSocket support
+Daphne	4.1.2	ASGI server (async)
+LLM & AI
+Tecnologia	Versão	Uso
+LangChain	0.3.17	Framework LLM
+LangChain-Core	0.3.33	Core abstractions
+LangChain-OpenAI	0.3.3	OpenAI/DeepSeek client
+LangGraph	0.2.66	Agent orchestration (grafo de agentes)
+OpenAI SDK	1.61.0	API client
+DeepSeek API	-	LLM provider (deepseek-chat)
+tiktoken	0.12.0	Tokenização
+RAG & Retrieval
+Tecnologia	Versão	Uso
+scikit-learn	1.6.1	TF-IDF Vectorizer
+TfidfVectorizer	-	Busca semântica
+cosine_similarity	-	Ranking de relevância
+sqlglot	28.6.0	SQL parsing & validação
+Databases
+Tecnologia	Versão	Uso
+PostgreSQL	15	Database principal (Django ORM)
+DuckDB	1.1.3	Analytics engine (SQL em Parquet)
+Redis	7.x	Message broker (Channels)
+SQLAlchemy	2.0.45	DB introspection (SQL Expert)
+Data Processing
+Tecnologia	Versão	Uso
+Pandas	2.2.3	DataFrames
+Polars	1.21.0	DataFrames (performance)
+PyArrow	19.0.0	Parquet I/O
+OpenPyXL	3.1.5	Excel reading
+fastexcel	0.12.0	Excel rápido
+Frontend
+Tecnologia	Versão	Uso
+React	19.2.0	UI Framework
+Vite	7.2.4	Build tool
+Tailwind CSS	3.4.1	Styling
+Recharts	3.6.0	Gráficos
+Plotly.js	3.3.1	Gráficos interativos
+Axios	1.13.2	HTTP client
+Lucide React	0.562.0	Ícones
+Infrastructure
+Tecnologia	Versão	Uso
+Docker	-	Containerização
+Docker Compose	3.8	Orquestração
+Node.js	20	Runtime frontend
+Comunicação
+Tecnologia	Uso
+WebSocket	Chat real-time
+REST API	Endpoints dashboard
+JSON	Formato de dados
+Utilitários
+Tecnologia	Versão	Uso
+Pydantic	2.10.6	Validação de dados
+python-dotenv	1.0.1	Environment vars
+httpx	0.28.1	Async HTTP

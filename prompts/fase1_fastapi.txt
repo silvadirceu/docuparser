@@ -1,0 +1,129 @@
+# Prompt: API DocuParse Experimental – OCR & Structured Extraction
+
+## 🎯 Objetivo
+
+Desenvolver uma API em **FastAPI** (backend-ocr) para validar a extração de dados estruturados 
+de documentos complexos (Notas Fiscais, recibos e tabelas manuscritas). 
+O sistema deve atuar como um roteador que seleciona a ferramenta de OCR ideal e 
+retorna os dados já formatados em **JSON estruturado**.
+
+## 🏗️ Requisitos de Arquitetura (Stateless)
+
+- **Framework:** FastAPI.
+- **Sem Persistência:** Não utilizar bancos de dados ou autenticação nesta fase.
+- **Entrada:** Upload de arquivo único (PDF, JPEG, PNG).
+- **Saída:** JSON puro contendo metadados do processo e a transcrição estruturada.
+
+## 🧠 Agente de Classificação e Seleção
+
+O backend deve implementar uma lógica de decisão para escolher o conjunto de ferramentas baseado no input:
+
+1. **PDF Digital (Text Layer):** Usar `pdfplumber` ou `docling` para extrair tabelas e textos preservando a coordenada.
+2. **Imagens/Scans (Standard):** Pré-processamento com `opencv-python` seguido de `pytesseract` ou `easyocr`.
+3. **Documentos Complexos/Manuscritos:** Enviar para `llama-parse`, `unstructured` ou `deepseek-ocr` para garantir a extração de tabelas e campos manuscritos em JSON.
+
+## 📋 Definição do JSON de Saída
+
+A resposta da API deve seguir estritamente este formato:
+
+```json
+{
+  "filename": "nf_servico_01.pdf",
+  "detected_type": "handwritten_scanned",
+  "tools_used": ["opencv-python", "easyocr", "llama-parse"], 
+  "transcription": {
+    "document_info": {
+      "type": "Nota Fiscal",
+      "number": "12345",
+      "date": "2023-10-27"
+    },
+    "entities": {
+      "issuer": "Empresa X LTDA",
+      "recipient": "João Silva"
+    },
+    "tables": [
+      {
+        "description": "Serviço de Consultoria",
+        "quantity": 1,
+        "unit_price": 500.00,
+        "total": 500.00
+      }
+    ],
+    "totals": {
+      "subtotal": 500.00,
+      "tax": 25.00,
+      "grand_total": 525.00
+    },
+    "raw_text_fallback": "Texto bruto completo aqui para conferência..."
+  }
+}
+
+```
+
+## Estrutura do Projeto
+
+A infraestrutura inicial baseada em microserviços.
+
+Tarefa: Gere os arquivos base para a estrutura de pastas fornecida:
+
+```text
+docuparse-project/
+├── docker-compose.yml         # Orquestração de todos os serviços (FE, BE, OCR)
+├── .env                       # Variáveis de ambiente globais
+├── README.md                  # Documentação técnica do ecossistema
+│
+├── frontend/                  # Projeto React + Vite (Porta 3000)
+│   ├── Dockerfile
+│   ├── package.json
+│   ├── tailwind.config.js     # Configuração Shadcn/UI [cite: 3]
+│   ├── src/
+│   │   ├── components/        # UI (Dropzone, Split View, Skeletons) [cite: 3]
+│   │   ├── pages/             # Dashboard, Login, Histórico [cite: 3]
+│   │   ├── services/          # Conexão com a API do Django
+│   │   └── hooks/             # Lógica de estado e chamadas assíncronas
+│
+├── backend-core/              # Django (Gestão e Autenticação - Porta 8000) 
+│   ├── Dockerfile
+│   ├── manage.py
+│   ├── core/                  # Configurações do projeto Django
+│   ├── accounts/              # App de Autenticação (JWT/User) 
+│   ├── documents/             # App de Gestão (CRUD, Histórico, Webhooks) [cite: 7, 9]
+│   │   ├── services/          # Client para chamar a API do FastAPI
+│   │   └── models.py          # Tabelas: Users, Documents, ExtractedData 
+│   └── requirements.txt
+│
+└── backend-ocr/               # FastAPI (Motor de IA e Extração - Porta 8080) 
+    ├── Dockerfile
+    ├── main.py                # Entrypoint FastAPI
+    ├── requirements.txt
+    ├── agent/                 # Agente de decisão (Lógica de Seleção de OCR)
+    │   ├── classifier.py      # Identifica PDF Digital vs Imagem vs Manuscrito
+    │   └── router.py          # Roteia para a melhor ferramenta
+    ├── engines/               # Adaptadores para cada ferramenta
+    │   ├── tesseract_engine.py
+    │   ├── easyocr_engine.py
+    │   ├── docling_engine.py
+    │   └── llamaparse_engine.py
+    └── utils/                 # Processamento OpenCV e manipulação de arquivos
+```
+
+- docker-compose.yml: Configure três serviços: frontend (React), backend-core (Django) e backend-ocr (FastAPI). Use redes internas para comunicação. 2. backend-ocr (FastAPI): Crie o main.py com o endpoint POST /process que recebe o arquivo e retorna o JSON estruturado. Inclua placeholders para as bibliotecas: opencv-python, pytesseract, easyocr, pdfplumber, docling, unstructured, llama-parse.
+
+- backend-core (Django): Configure o settings.py básico e um service Python que utilize a biblioteca requests para enviar o arquivo recebido no upload para a URL do backend-ocr. 4. Comunicação: O Django deve ser a única porta de entrada para o usuário (Proxy/Gateway) para garantir a autenticação futura. O FastAPI deve responder apenas a requisições internas do Django.
+
+- Requisito de Saída do OCR: O JSON final do FastAPI deve seguir o esquema de "transcription" como um objeto estruturado (Campos, Tabelas, Confiança) e uma lista tools_used.
+
+## 🛠️ Instruções para o Antigravity
+
+O objetivo do projeto atual é a construção do backend-ocr.
+
+1. **Mapeamento de Ferramentas:** Implementar um dicionário de "capabilities" onde cada ferramenta (ex: `unstructured` para tabelas, `pytesseract` para texto simples) é chamada conforme a necessidade detectada pelo agente.
+2. **Normalização de Tabelas:** Garanta que, independentemente da ferramenta (ex: `pdf2image` + `easyocr`), a saída de tabelas seja sempre uma lista de objetos JSON.
+3. **Logs de Performance:** Inclua no console o tempo de resposta de cada motor de OCR para análise de custo-benefício.
+4. **Prompt de Extração:** Caso use LLMs (como no `llama-parse`), configure o prompt de sistema para: *"Extraia todos os dados deste documento no formato JSON, focando em chaves/valores de cabeçalho e linhas de tabelas"*.
+5. **instruções:** gere todas as instruções nevcessárias para o funcionamento do sistema.
+6. **Documentação:** gere todas as documentações nevcessárias para o funcionamento do sistema.
+7. **Testes:** gere todos os testes nevcessários para o funcionamento do sistema.
+8. **Deploy:** gere todos os arquivos necessários para o deploy do sistema.
+9. **docs:** salve na pasta docs todos os passos que você utilizou para desenvolver o sistema. 
+10. **Estrutura:** gere todas as estruturas de pastas necessárias para o funcionamento do sistema.

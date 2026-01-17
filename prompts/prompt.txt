@@ -1,0 +1,220 @@
+
+# 🎯 Prompt Geral do Sistema – DocuParse
+
+Construa uma plataforma web profissional para **upload, extração, validação e padronização de dados de documentos (PDFs e imagens)**, transformando-os em **JSON estruturado**, com foco em **OCR inteligente, UX avançada e automação**, garantindo segurança, escalabilidade local e possibilidade de evolução futura.
+
+---
+
+# 🧩 FRONTEND — Requisitos por Fase
+
+## 🔹 FASE 1 — MVP (Essencial e Funcional)
+
+**Objetivo:** Permitir upload, visualização e edição básica dos dados extraídos.
+
+### Funcionalidades
+
+* Implementar **autenticação por e-mail e senha**
+* Criar **Dropzone de Upload**:
+
+  * Suporte a PDF, JPEG e PNG
+  * Upload individual
+* Tela principal com **Split View**:
+
+  * Coluna esquerda: visualização do documento (PDF renderizado ou imagem)
+  * Coluna direita: JSON extraído em formato editável
+* Permitir:
+
+  * Revisar
+  * Editar
+  * Salvar dados extraídos
+* Histórico de documentos por usuário
+
+### UX / UI
+
+* Design **Mobile-first (min 375px)**
+* Componentes obrigatórios: **Shadcn/UI**
+
+  * Card, Button, Input, Tabs, Skeleton, Toast
+* Feedback visual:
+
+  * Skeletons durante processamento
+  * Toasts de sucesso/erro
+* Identidade visual:
+
+  * Fundo: `#F9FAFB`
+  * Azul primário: `#3B82F6`
+  * Fonte: **Inter**
+* Header fixo com logo e transições suaves
+* Hero Section com CTA “Comece Agora”
+
+---
+
+## 🔹 FASE 2 — UX Avançada e Produtividade
+
+**Objetivo:** Tornar a revisão de dados rápida, intuitiva e visual.
+
+### Funcionalidades
+
+* **Modo de edição inline**:
+
+  * Substituir JSON bruto por formulário estruturado
+* **Confidence Score por campo**:
+
+  * Exibir campos com baixa confiança (<70) em vermelho
+* **Zoom Dinâmico (Lupa Inteligente)**:
+
+  * Ao clicar em um campo, o documento faz zoom automático na área correspondente
+* **Reordenação via Drag & Drop**:
+
+  * Para colunas de tabelas extraídas
+
+### UX
+
+* Destaques visuais para:
+
+  * Erros
+  * Divergências
+  * Campos obrigatórios
+* Animações suaves (hover, focus, loading)
+
+---
+
+## 🔹 FASE 3 — Automação e Escala
+
+**Objetivo:** Facilitar operações em massa e integração com outros sistemas.
+
+### Funcionalidades
+
+* **Upload em Lote**:
+
+  * Até 50 arquivos simultâneos
+  * Barra de progresso global
+* **Exportação de Dados**:
+
+  * Excel (.xlsx)
+  * Envio via Webhook
+* **Notificações**:
+
+  * Status de processamento (UI, e-mail ou push)
+
+---
+
+# ⚙️ BACKEND — Requisitos por Fase
+
+## 🔹 FASE 1 — MVP Técnico
+
+**Objetivo:** Processar documentos, extrair dados e armazenar com segurança.
+
+### Funcionalidades
+
+* API de autenticação (JWT ou sessão)
+* Upload de arquivos com armazenamento local
+* Integração com serviço de **OCR + Parsing**
+* Conversão para **JSON padronizado**
+* Persistência em **SQLite com ORM**
+* Controle de acesso:
+
+  * Usuário só acessa seus próprios dados (row-level security)
+
+### Estrutura de Dados
+
+```text
+users
+- id
+- email
+- password_hash
+- created_at
+
+documents
+- id
+- user_id
+- file_path
+- original_filename
+- file_hash
+- detected_type
+- created_at
+
+extracted_data
+- id
+- document_id
+- data (JSON)
+- created_at
+```
+
+---
+
+## 🔹 FASE 2 — Inteligência e Validação
+
+**Objetivo:** Aumentar a confiabilidade dos dados extraídos.
+
+### Funcionalidades
+
+* **Confidence Score por campo** (0–100)
+* **Validação cruzada automática**:
+
+  * Soma de itens × valor total (notas fiscais)
+* **Detecção automática de tipo de documento**
+* Estrutura JSON enriquecida:
+
+```json
+{
+  "campo": {
+    "value": "123,45",
+    "confidence": 82,
+    "bbox": [x, y, width, height]
+  }
+}
+```
+
+---
+
+## 🔹 FASE 3 — Performance, Automação e Integração
+
+**Objetivo:** Tornar o sistema robusto e escalável.
+
+### Funcionalidades
+
+* **Fila de Processamento (Background Jobs)**:
+
+  * OCR assíncrono
+  * Ex: Redis + Bull ou fila Python simples
+* **Cache de OCR por Hash (MD5/SHA)**:
+
+  * Evitar reprocessamento de arquivos duplicados
+* **Processamento em Lote**
+* **Webhooks configuráveis**:
+
+  * Envio automático ao finalizar processamento
+* Endpoint de exportação:
+
+  * Excel
+  * JSON estruturado
+  * Payload para ERP
+
+---
+
+# 🧠 Diretrizes Arquiteturais
+
+* Backend preparado para migração futura (PostgreSQL)
+* Separação clara:
+
+  * Upload
+  * OCR
+  * Validação
+  * Persistência
+* Código modular e orientado a serviços
+* Logs de processamento e erros
+
+---
+
+# ✅ Resultado Esperado
+
+Um produto:
+
+* Usável desde o MVP
+* Evolutivo por fases
+* Pronto para escalar
+* Com UX profissional
+* Focado em **extração de dados confiável**, não apenas OCR bruto
+
+
